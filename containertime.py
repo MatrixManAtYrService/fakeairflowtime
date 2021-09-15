@@ -28,9 +28,14 @@ def execute_wrapper(conn, cursor, sql):
     print("query:", file=sys.stderr)
     cursor.execute(sql)
     print(textwrap.indent(sql, "    "), file=sys.stderr)
-    for notice in conn.notices:
-        if 'NOTICE:  relation "faketime" already exists, skipping' not in notice:
-            print(notice, file=sys.stderr)
+    try:
+        for notice in conn.notices:
+            if 'NOTICE:  relation "faketime" already exists, skipping' not in notice:
+                print(notice, file=sys.stderr)
+        del conn.notices[:]
+        
+    except AttributeError:
+        pass
 
 
 def get_or_set(now, faked) -> datetime:
@@ -116,16 +121,15 @@ def get_or_set(now, faked) -> datetime:
 
         replace_original = textwrap.dedent(
             """
-                CREATE OR REPLACE FUNCTION now() RETURNS timestamptz
-                AS $func$
-                    SELECT system_now() {op} INTERVAL '{seconds} seconds';
-                $func$ LANGUAGE SQL;
-                """.format(
+            CREATE OR REPLACE FUNCTION now() RETURNS timestamptz
+            AS $func$
+                SELECT system_now() {op} INTERVAL '{seconds} seconds';
+            $func$ LANGUAGE SQL;
+            """.format(
                 op=op, seconds=offset.total_seconds()
             )
         )
         execute_wrapper(conn, cursor, replace_original)
-
 
     # mischeif managed
     cursor.close()
